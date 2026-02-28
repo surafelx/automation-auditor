@@ -277,3 +277,81 @@ def evidence_aggregator(state: AgentState) -> AgentState:
     state["execution_trace"].append("EvidenceAggregator: Aggregation complete")
     
     return state
+
+
+def vision_inspector(state: AgentState) -> AgentState:
+    """
+    Vision Inspector Detective - Analyzes diagrams in PDF documents.
+    
+    Responsibilities:
+    - Extract images from PDF documents
+    - Analyze architectural diagrams
+    - Classify diagram types (StateGraph, Sequence, Flowchart)
+    - Detect parallel vs sequential flow patterns
+    
+    Returns Evidence under key:
+    - swarm_visual
+    
+    Args:
+        state: Current agent state
+        
+    Returns:
+        Updated state with visual evidence
+    """
+    state["execution_trace"].append("VisionInspector: Starting diagram analysis")
+    
+    doc_path = state.get("doc_path")
+    if not doc_path:
+        state["errors"].append("VisionInspector: No doc_path provided")
+        state["execution_trace"].append("VisionInspector: Aborted - no doc_path")
+        return state
+    
+    evidence_id = str(uuid.uuid4())[:8]
+    
+    try:
+        state["execution_trace"].append(f"VisionInspector: Extracting images from {doc_path}")
+        
+        # Extract images from PDF
+        image_paths = doc_tools.extract_images_from_pdf(doc_path)
+        state["execution_trace"].append(f"VisionInspector: Found {len(image_paths)} images")
+        
+        # Analyze each diagram
+        analysis_results = []
+        for img_path in image_paths:
+            analysis = doc_tools.analyze_diagram(img_path)
+            analysis_results.append(analysis)
+        
+        # Create evidence
+        evidence_list = doc_tools.create_vision_evidence(
+            evidence_id=evidence_id,
+            doc_path=doc_path,
+            image_analysis=analysis_results
+        )
+        
+        # Add evidence to state
+        for evidence in evidence_list:
+            state["evidence"].append(evidence)
+            if evidence.evidence_type == "swarm_visual":
+                if "swarm_visual" not in state:
+                    state["swarm_visual"] = []
+                state["swarm_visual"].append(evidence)
+        
+        state["execution_trace"].append(f"VisionInspector: Complete - {len(evidence_list)} evidence items")
+        
+    except Exception as e:
+        error_msg = f"VisionInspector error: {str(e)}"
+        state["errors"].append(error_msg)
+        state["execution_trace"].append(f"VisionInspector: {error_msg}")
+        
+        # Create error evidence
+        evidence_list = doc_tools.create_vision_evidence(
+            evidence_id=evidence_id,
+            doc_path=doc_path,
+            image_analysis=[],
+            error_message=str(e)
+        )
+        
+        for evidence in evidence_list:
+            state["evidence"].append(evidence)
+    
+    return state

@@ -48,6 +48,12 @@ def main():
         action="store_true",
         help="Run self-audit on the current repository"
     )
+    parser.add_argument(
+        "--report-dir",
+        type=str,
+        default="audit/report_onself_generated",
+        help="Directory to save audit reports"
+    )
     
     args = parser.parse_args()
     
@@ -80,6 +86,9 @@ def main():
         
         args.repo_url = repo_url
         args.doc_path = doc_path
+        
+        # Set output to self-audit directory
+        args.report_dir = "audit/report_onself_generated"
     
     # Validate inputs
     if not args.repo_url and not args.doc_path:
@@ -87,11 +96,25 @@ def main():
         parser.print_help()
         sys.exit(1)
     
+    # Create report directory
+    os.makedirs(args.report_dir, exist_ok=True)
+    
+    # Generate output filename
+    if args.repo_url:
+        # Extract repo name from URL
+        repo_name = args.repo_url.split("/")[-1].replace(".git", "")
+        output_filename = f"audit_{repo_name}.md"
+    else:
+        output_filename = "audit_report.md"
+    
+    output_path = os.path.join(args.report_dir, output_filename)
+    
     print("=" * 60)
     print("AUTOMATON AUDITOR - Digital Courtroom")
     print("=" * 60)
     print(f"Repository: {args.repo_url or 'N/A'}")
     print(f"Document: {args.doc_path or 'N/A'}")
+    print(f"Output: {output_path}")
     print("=" * 60)
     
     # Run the audit
@@ -131,10 +154,16 @@ def main():
             md_report = generate_markdown_report(final_state)
             
             # Write to file
-            with open(args.output, "w", encoding="utf-8") as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(md_report)
             
-            print(f"\n✓ Full report saved to: {args.output}")
+            print(f"\n✓ Full report saved to: {output_path}")
+            
+            # Also write to default location if different
+            if args.output != output_path:
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(md_report)
+                print(f"✓ Also saved to: {args.output}")
         else:
             print("Error: No audit report generated")
             print("Final state keys:", list(final_state.keys()) if isinstance(final_state, dict) else "Not a dict")

@@ -396,3 +396,166 @@ def analyze_document(doc_path: str) -> dict[str, Any]:
         result["error"] = str(e)
     
     return result
+
+
+def extract_images_from_pdf(pdf_path: str, output_dir: Optional[str] = None) -> list[str]:
+    """
+    Extract images from a PDF file.
+    
+    Args:
+        pdf_path: Path to the PDF file
+        output_dir: Directory to save extracted images
+        
+    Returns:
+        List of paths to extracted images
+    """
+    image_paths = []
+    
+    if not PDF_AVAILABLE:
+        return image_paths
+    
+    try:
+        from PIL import Image
+        import io
+        
+        path = Path(pdf_path)
+        if not path.exists():
+            return image_paths
+        
+        # Create output directory
+        if output_dir is None:
+            output_dir = str(Path(pdf_path).parent / "extracted_images")
+        
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        
+        with open(pdf_path, "rb") as f:
+            reader = PyPDF2.PdfReader(f)
+            
+            for page_num, page in enumerate(reader.pages):
+                if "/XObject" in page["/Resources"]:
+                    xobjects = page["/Resources"]["/XObject"].get_object()
+                    
+                    for obj in xobjects:
+                        if xobjects[obj]["/Subtype"] == "/Image":
+                            try:
+                                # Extract image
+                                data = xobjects[obj].get_data()
+                                image = Image.open(io.BytesIO(data))
+                                
+                                # Save image
+                                img_path = Path(output_dir) / f"page{page_num + 1}_{obj[1:]}.png"
+                                image.save(img_path)
+                                image_paths.append(str(img_path))
+                            except Exception:
+                                # Skip images that can't be extracted
+                                pass
+                                
+    except ImportError:
+        # PIL not available, return empty list
+        pass
+    except Exception:
+        # Other errors, return what we have
+        pass
+    
+    return image_paths
+
+
+def analyze_diagram(image_path: str) -> dict[str, Any]:
+    """
+    Analyze a diagram image for architectural patterns.
+    
+    Args:
+        image_path: Path to the image file
+        
+    Returns:
+        Analysis results with diagram classification
+    """
+    result = {
+        "image_path": image_path,
+        "diagram_type": "unknown",
+        "has_parallel_flow": False,
+        "has_sequential_flow": False,
+        "confidence": 0.0,
+        "error": None
+    }
+    
+    # This would typically use a multimodal LLM
+    # For now, we provide a placeholder that analyzes file metadata
+    try:
+        path = Path(image_path)
+        if not path.exists():
+            result["error"] = "Image file not found"
+            return result
+        
+        # Basic file analysis
+        file_size = path.stat().st_size
+        result["file_size"] = file_size
+        result["diagram_type"] = "unclassified"
+        result["confidence"] = 0.3
+        
+        # Note: Full implementation would use GPT-4V or Gemini Pro Vision
+        # to analyze the actual image content
+        result["note"] = "Image analysis requires multimodal LLM integration"
+        
+    except Exception as e:
+        result["error"] = str(e)
+    
+    return result
+
+
+def create_vision_evidence(
+    evidence_id: str,
+    doc_path: str,
+    image_analysis: list[dict[str, Any]],
+    error_message: Optional[str] = None
+) -> list[Evidence]:
+    """
+    Create Evidence objects from diagram analysis.
+    
+    Args:
+        evidence_id: Base ID for evidence
+        doc_path: Path to the document
+        image_analysis: List of diagram analysis results
+        error_message: Any error that occurred
+        
+    Returns:
+        List of Evidence objects
+    """
+    from datetime import datetime
+    
+    evidence_list = []
+    
+    if error_message:
+        content = f"Diagram analysis failed: {error_message}"
+        confidence = 0.1
+    else:
+        total_images = len(image_analysis)
+        parallel_count = sum(1 for img in image_analysis if img.get("has_parallel_flow"))
+        sequential_count = sum(1 for img in image_analysis if img.get("has_sequential_flow"))
+        
+        content = f"""
+Architectural Diagram Analysis for: {doc_path}
+
+Total Diagrams Found: {total_images}
+Diagrams with Parallel Flow: {parallel_count}
+Diagrams with Sequential Flow: {sequential_count}
+
+Diagram Classifications:
+"""
+        for i, img in enumerate(image_analysis):
+            content += f"\n[{i+1}] {img.get('diagram_type', 'unknown')}"
+            content += f" - Confidence: {img.get('confidence', 0):.2f}"
+        
+        confidence = min(0.7, 0.2 + (parallel_count / max(total_images, 1)) * 0.5)
+    
+    evidence_list.append(Evidence(
+        evidence_id=f"{evidence_id}_swarm_visual",
+        evidence_type="swarm_visual",
+        content=content,
+        source=doc_path,
+        timestamp=datetime.utcnow(),
+        metadata={"images_analyzed": len(image_analysis)},
+        confidence=confidence
+    ))
+    
+    return evidence_list

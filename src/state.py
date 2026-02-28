@@ -123,6 +123,7 @@ class AgentState(TypedDict):
     state_management_rigor: Annotated[list[Evidence], operator.add]
     theoretical_depth: Annotated[list[Evidence], operator.add]
     report_accuracy: Annotated[list[Evidence], operator.add]
+    swarm_visual: Annotated[list[Evidence], operator.add]
     
     # Audit results
     audit_report: Optional[AuditReport]
@@ -166,6 +167,7 @@ def create_initial_state(
         "state_management_rigor": [],
         "theoretical_depth": [],
         "report_accuracy": [],
+        "swarm_visual": [],
         "audit_report": None,
         "errors": [],
         "execution_trace": [],

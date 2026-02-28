@@ -3,6 +3,7 @@ Automaton Auditor - LangGraph Infrastructure
 
 Production-grade LangGraph implementation for multi-agent forensic evidence collection.
 Complete graph structure with parallel detectives, parallel judges, and Chief Justice synthesis.
+With conditional error handling for robustness.
 
 Graph structure:
     START → ContextBuilder 
@@ -15,6 +16,7 @@ Graph structure:
 """
 
 from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode
 from typing import Optional
 
 from .nodes.detectives import (
@@ -22,6 +24,7 @@ from .nodes.detectives import (
     doc_analyst,
     evidence_aggregator,
     repo_investigator,
+    vision_inspector,
 )
 from .nodes.judges import (
     defense_judge,
@@ -33,13 +36,29 @@ from .nodes.justice import chief_justice
 from .state import AgentState, create_initial_state
 
 
+def should_run_repo_investigator(state: AgentState) -> bool:
+    """Determine if repo investigator should run based on state."""
+    return bool(state.get("repo_url"))
+
+
+def should_run_doc_analyst(state: AgentState) -> bool:
+    """Determine if doc analyst should run based on state."""
+    return bool(state.get("doc_path"))
+
+
+def should_run_vision_inspector(state: AgentState) -> bool:
+    """Determine if vision inspector should run based on state."""
+    # Run if doc_path exists (can extract images from PDF)
+    return bool(state.get("doc_path"))
+
+
 def create_audit_graph() -> StateGraph:
     """
     Create and compile the complete Automaton Auditor LangGraph.
     
     Graph structure:
     START → ContextBuilder 
-           → [RepoInvestigator || DocAnalyst] (parallel fan-out)
+           → [RepoInvestigator || DocAnalyst || VisionInspector] (conditional fan-out)
            → EvidenceAggregator (fan-in)
            → [Prosecutor || Defense || TechLead] (parallel fan-out)
            → JudgesAggregator (fan-in)
@@ -58,6 +77,7 @@ def create_audit_graph() -> StateGraph:
     workflow.add_node("context_builder", context_builder)
     workflow.add_node("repo_investigator", repo_investigator)
     workflow.add_node("doc_analyst", doc_analyst)
+    workflow.add_node("vision_inspector", vision_inspector)
     workflow.add_node("evidence_aggregator", evidence_aggregator)
     
     # === JUDICIAL LAYER ===
@@ -78,21 +98,80 @@ def create_audit_graph() -> StateGraph:
     # Set entry point
     workflow.set_entry_point("context_builder")
     
-    # === DETECTIVE FAN-OUT ===
-    # ContextBuilder → Parallel Detectives (fan-out)
-    workflow.add_edge("context_builder", "repo_investigator")
-    workflow.add_edge("context_builder", "doc_analyst")
+    # === CONDITIONAL DETECTIVE FAN-OUT ===
+    # ContextBuilder → Conditional Detectives (fan-out)
+    # Use conditional edges to handle missing inputs gracefully
+    workflow.add_conditional_edges(
+        "context_builder",
+        should_run_repo_investigator,
+        {
+            True: "repo_investigator",
+            False: "__end__"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "context_builder",
+        should_run_doc_analyst,
+        {
+            True: "doc_analyst",
+            False: "__end__"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "context_builder", 
+        should_run_vision_inspector,
+        {
+            True: "vision_inspector",
+            False: "__end__"
+        }
+    )
+    
+    # === DETECTIVE ERROR HANDLING ===
+    # Add error handling: if any detective fails, still proceed to aggregation
+    # The detectives already handle their own errors internally
     
     # === DETECTIVE FAN-IN ===
-    # Both detectives must complete before aggregation
+    # All detectives that ran → EvidenceAggregator (fan-in)
+    # Use conditional edges: if node ran, go to aggregator
+    workflow.add_conditional_edges(
+        "repo_investigator",
+        lambda x: "evidence_aggregator",
+        {
+            "evidence_aggregator": "evidence_aggregator"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "doc_analyst",
+        lambda x: "evidence_aggregator",
+        {
+            "evidence_aggregator": "evidence_aggregator"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "vision_inspector",
+        lambda x: "evidence_aggregator",
+        {
+            "evidence_aggregator": "evidence_aggregator"
+        }
+    )
+    
+    # Simplified: Connect all detectives to aggregator (they'll add empty lists if skipped)
     workflow.add_edge("repo_investigator", "evidence_aggregator")
     workflow.add_edge("doc_analyst", "evidence_aggregator")
+    workflow.add_edge("vision_inspector", "evidence_aggregator")
     
     # === JUDICIAL FAN-OUT ===
     # EvidenceAggregator → Parallel Judges (fan-out)
     workflow.add_edge("evidence_aggregator", "prosecutor_judge")
     workflow.add_edge("evidence_aggregator", "defense_judge")
     workflow.add_edge("evidence_aggregator", "tech_lead_judge")
+    
+    # === JUDICIAL ERROR HANDLING ===
+    # Each judge handles its own errors gracefully
     
     # === JUDICIAL FAN-IN ===
     # All judges must complete before aggregation
