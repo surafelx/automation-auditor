@@ -8,7 +8,7 @@ Contains RepoInvestigator and DocAnalyst detectives that run in parallel.
 import shutil
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from ..state import AgentState, Evidence
 from ..tools import repo_tools, doc_tools
@@ -70,7 +70,7 @@ def repo_investigator(state: AgentState) -> AgentState:
         return state
     
     evidence_id = str(uuid.uuid4())[:8]
-    temp_repo_path: str | None = None
+    temp_repo_path: Optional[str] = None
     
     try:
         # Clone repository to temporary directory

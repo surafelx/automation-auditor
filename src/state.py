@@ -8,7 +8,7 @@ Uses Pydantic BaseModel for evidence structures and TypedDict for agent state.
 import operator
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, TypedDict
+from typing import Annotated, Optional, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -70,7 +70,7 @@ class AuditReport(BaseModel):
     summary: str = Field(..., description="Executive summary of findings")
     criterion_results: list[CriterionResult] = Field(default_factory=list, description="Results for each criterion")
     evidence_collected: dict[str, list[Evidence]] = Field(default_factory=dict, description="All evidence by type")
-    judicial_opinion: JudicialOpinion | None = Field(default=None, description="Final judicial opinion")
+    judicial_opinion: Optional[JudicialOpinion] = Field(default=None, description="Final judicial opinion")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Report generation time")
     graph_path: str = Field(..., description="Path to the audited graph")
     
@@ -110,9 +110,9 @@ class AgentState(TypedDict):
     """
     
     # Context information
-    repo_url: str | None
-    doc_path: str | None
-    graph_path: str | None
+    repo_url: Optional[str]
+    doc_path: Optional[str]
+    graph_path: Optional[str]
     
     # Evidence collected by detectives (list reducer for parallel merging)
     evidence: Annotated[list[Evidence], operator.add]
@@ -125,7 +125,7 @@ class AgentState(TypedDict):
     report_accuracy: Annotated[list[Evidence], operator.add]
     
     # Audit results
-    audit_report: AuditReport | None
+    audit_report: Optional[AuditReport]
     
     # Execution metadata
     errors: Annotated[list[str], operator.add]
@@ -135,12 +135,15 @@ class AgentState(TypedDict):
     context_built: bool
     repo_cloned: bool
     docs_analyzed: bool
+    
+    # Judicial opinions from all three judges
+    judicial_opinions: Annotated[list[JudicialOpinion], operator.add]
 
 
 def create_initial_state(
-    repo_url: str | None = None,
-    doc_path: str | None = None,
-    graph_path: str | None = None
+    repo_url: Optional[str] = None,
+    doc_path: Optional[str] = None,
+    graph_path: Optional[str] = None
 ) -> AgentState:
     """
     Factory function to create initial agent state.
@@ -169,4 +172,5 @@ def create_initial_state(
         "context_built": False,
         "repo_cloned": False,
         "docs_analyzed": False,
+        "judicial_opinions": [],
     }

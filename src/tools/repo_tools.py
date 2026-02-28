@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from ..state import Evidence
 
@@ -20,8 +20,8 @@ from ..state import Evidence
 class GitCloneResult:
     """Result of a git clone operation."""
     success: bool
-    repo_path: str | None
-    error_message: str | None
+    repo_path: Optional[str]
+    error_message: Optional[str]
 
 
 @dataclass 
@@ -88,7 +88,7 @@ def secure_git_clone(repo_url: str, branch: str = "main") -> GitCloneResult:
         )
 
 
-def clone_repo_to_temp(repo_url: str, branch: str = "main") -> str | None:
+def clone_repo_to_temp(repo_url: str, branch: str = "main") -> Optional[str]:
     """
     Clone repository to a persistent temp directory.
     
@@ -283,7 +283,7 @@ def create_git_evidence(
     repo_url: str,
     git_log: list[GitLogEntry],
     graph_analysis: dict[str, Any],
-    error_message: str | None = None
+    error_message: Optional[str] = None
 ) -> list[Evidence]:
     """
     Create Evidence objects from git forensic analysis.

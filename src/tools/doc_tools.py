@@ -7,7 +7,7 @@ PDF parsing and analysis for theoretical depth assessment.
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 # Try to import PyPDF2, fall back to other methods if not available
 try:
@@ -53,7 +53,7 @@ KEY_TERMS = {
 class DocumentChunk:
     """A chunk of document content with metadata."""
     content: str
-    page_number: int | None
+    page_number: Optional[int]
     chunk_index: int
     word_count: int
 
@@ -64,7 +64,7 @@ class TermOccurrence:
     term: str
     normalized_term: str
     context: str
-    page_number: int | None
+    page_number: Optional[int]
     is_explained: bool  # True if appears to be explained, not just mentioned
 
 
@@ -246,7 +246,7 @@ def create_document_evidence(
     evidence_id: str,
     doc_path: str,
     analysis_result: dict[str, Any],
-    error_message: str | None = None
+    error_message: Optional[str] = None
 ) -> list[Evidence]:
     """
     Create Evidence objects from document analysis.
