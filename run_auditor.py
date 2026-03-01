@@ -11,6 +11,10 @@ import os
 import sys
 from pathlib import Path
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -146,6 +150,20 @@ def main():
     # Get the audit report from final state
     if isinstance(final_state, dict):
         audit_report = final_state.get("audit_report")
+        
+        # Debug: Print judicial opinions
+        judicial_opinions = final_state.get("judicial_opinions", [])
+        print(f"DEBUG: Judicial opinions count: {len(judicial_opinions)}")
+        
+        # Debug: Print errors
+        errors = final_state.get("errors", [])
+        if errors:
+            print(f"DEBUG: Errors: {errors}")
+        
+        # Debug: Print execution trace
+        trace = final_state.get("execution_trace", [])
+        print(f"DEBUG: Execution trace: {trace[:10]}...")
+        
         if audit_report:
             print(f"\nReport ID: {audit_report.report_id}")
             print(f"Summary: {audit_report.summary[:500]}...")
@@ -157,13 +175,13 @@ def main():
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(md_report)
             
-            print(f"\n✓ Full report saved to: {output_path}")
+            print(f"\n[OK] Full report saved to: {output_path}")
             
             # Also write to default location if different
             if args.output != output_path:
                 with open(args.output, "w", encoding="utf-8") as f:
                     f.write(md_report)
-                print(f"✓ Also saved to: {args.output}")
+                print(f"[OK] Also saved to: {args.output}")
         else:
             print("Error: No audit report generated")
             print("Final state keys:", list(final_state.keys()) if isinstance(final_state, dict) else "Not a dict")

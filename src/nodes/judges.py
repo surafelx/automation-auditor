@@ -5,6 +5,7 @@ LangGraph nodes for the judicial deliberation layer.
 Contains Prosecutor, Defense Attorney, and Tech Lead judges with distinct personas.
 """
 
+import os
 import uuid
 from typing import Any
 
@@ -139,12 +140,74 @@ Respond with:
 Remember: Your persona should influence your evaluation approach."""
 
 
-def get_llm() -> ChatOpenAI:
-    """Get the LLM instance for judges."""
-    return ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.3,
-    )
+# --- LangChain Imports ---
+
+# Try to import Ollama, fall back to OpenAI if not available
+try:
+    from langchain_ollama import ChatOllama
+    OLLAMA_AVAILABLE = True
+except ImportError:
+    OLLAMA_AVAILABLE = False
+
+try:
+    from langchain_openai import ChatOpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
+try:
+    from langchain_groq import ChatGroq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
+
+
+def get_llm():
+    """Get the LLM instance for judges. Prefers Groq (fast), then Gemini, then Ollama, then OpenAI."""
+    if GROQ_AVAILABLE:
+        # Ensure GROQ_API_KEY is set in environment
+        api_key = os.environ.get("GROQ_API_KEY", "")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not set in environment")
+        
+        return ChatGroq(
+            model="llama-3.1-8b-instant",
+            temperature=0.3,
+            groq_api_key=api_key
+        )
+    elif GEMINI_AVAILABLE:
+        # Ensure GOOGLE_API_KEY is set in environment
+        api_key = os.environ.get("GOOGLE_API_KEY", "")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY not set in environment")
+        
+        # Set explicitly for google.auth
+        os.environ["GOOGLE_API_KEY"] = api_key
+        
+        return ChatGoogleGenerativeAI(
+            model="gemini-3-flash-preview",
+            temperature=0.3,
+            google_api_key=api_key,
+            convert_system_message_to_human=True
+        )
+    elif OLLAMA_AVAILABLE:
+        return ChatOllama(
+            model="llama3.2",
+            temperature=0.3,
+        )
+    elif OPENAI_AVAILABLE:
+        return ChatOpenAI(
+            model="gpt-4o",
+            temperature=0.3,
+        )
+    else:
+        raise ImportError("No LLM available. Install: langchain-groq, langchain-google-genai, langchain-ollama, or langchain-openai")
 
 
 def _format_evidence_summary(evidence_list: list[Evidence]) -> str:
@@ -251,6 +314,16 @@ def prosecutor_judge(state: AgentState) -> AgentState:
             evidence_list=evidence_list
         )
         
+        # Defensive null check
+        if score_result is None:
+            score_result = CriterionScore(
+                criterion_id=criterion_id,
+                criterion_name=criterion_name,
+                score=3,
+                argument="Error: Judge evaluation returned no result. Defaulting to score 3.",
+                cited_evidence=[]
+            )
+        
         opinion = StateJudicialOpinion(
             opinion_id=f"prosecutor_{criterion_id}_{uuid.uuid4().hex[:8]}",
             verdict="REJECTED" if score_result.score <= 2 else "CONDITIONAL" if score_result.score <= 3 else "APPROVED",
@@ -309,6 +382,16 @@ def defense_judge(state: AgentState) -> AgentState:
             evidence_list=evidence_list
         )
         
+        # Defensive null check
+        if score_result is None:
+            score_result = CriterionScore(
+                criterion_id=criterion_id,
+                criterion_name=criterion_name,
+                score=3,
+                argument="Error: Judge evaluation returned no result. Defaulting to score 3.",
+                cited_evidence=[]
+            )
+        
         opinion = StateJudicialOpinion(
             opinion_id=f"defense_{criterion_id}_{uuid.uuid4().hex[:8]}",
             verdict="REJECTED" if score_result.score <= 2 else "CONDITIONAL" if score_result.score <= 3 else "APPROVED",
@@ -366,6 +449,16 @@ def tech_lead_judge(state: AgentState) -> AgentState:
             criterion_name=criterion_name,
             evidence_list=evidence_list
         )
+        
+        # Defensive null check
+        if score_result is None:
+            score_result = CriterionScore(
+                criterion_id=criterion_id,
+                criterion_name=criterion_name,
+                score=3,
+                argument="Error: Judge evaluation returned no result. Defaulting to score 3.",
+                cited_evidence=[]
+            )
         
         opinion = StateJudicialOpinion(
             opinion_id=f"techlead_{criterion_id}_{uuid.uuid4().hex[:8]}",

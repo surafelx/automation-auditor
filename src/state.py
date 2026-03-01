@@ -20,6 +20,7 @@ class EvidenceType(str, Enum):
     STATE_MANAGEMENT = "state_management_rigor"
     THEORETICAL_DEPTH = "theoretical_depth"
     REPORT_ACCURACY = "report_accuracy"
+    SWARM_VISUAL = "swarm_visual"
     GENERAL = "general"
 
 
@@ -57,7 +58,7 @@ class CriterionResult(BaseModel):
     
     criterion_name: str = Field(..., description="Name of the criterion evaluated")
     passed: bool = Field(..., description="Whether the criterion was met")
-    score: float = Field(ge=0.0, le=1.0, description="Score for this criterion")
+    score: float = Field(ge=1.0, le=5.0, description="Score for this criterion (1-5 scale)")
     findings: list[str] = Field(default_factory=list, description="Key findings")
     evidence_refs: list[str] = Field(default_factory=list, description="References to supporting evidence")
 
